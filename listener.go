@@ -26,14 +26,13 @@ func listen(queue string, threads int) {
         go doWork(queue)
       }
     } else {
-      time.Sleep(time.Sleep(1 * time.Second))
+      time.Sleep(1 * time.Second)
     }
   }
 }
 
 func doWork( queue string ) {
   var err error
-  var jsonStr string
   var response Response
   var payload Payload
   var httpResponse *http.Response
@@ -42,7 +41,7 @@ func doWork( queue string ) {
   var buff []byte
 
   // 1. pull work off queue
-  payload, err = Read(args[1])
+  payload, err = Read(queue)
 
   // 2. execute
   out, err = exec.Command(payload.Command).Output()
@@ -50,14 +49,14 @@ func doWork( queue string ) {
   // 3. send stdout as json array in post
   if err != nil{
     response.status = 1
-    response.message = err
+    response.message = err.Error()
   } else {
     response.status = 0
     response.message = string(out)
   }
   buff, err = json.Marshal(payload)
-  httpResponse, err = http.Post(payload.URI, "application/json", &buff)
-  req, err = http.NewRequest("POST", url, bytes.NewBuffer(buff))
+
+  req, err = http.NewRequest("POST", payload.URI, bytes.NewBuffer(buff))
   req.Header.Set("Content-Type", "application/json")
   // TODO: Loop through a config of headers that the user defines
 

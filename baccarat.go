@@ -12,13 +12,13 @@ func main() {
   isQ, queue := namedCommand(args, "-q")
   isPool, pool := namedCommand(args, "--pool")
   if isQ {
-
     if isPool{
+      var err error
       threads, err := strconv.ParseInt(pool, 10, 32)
       if err != nil {
         fmt.Println(err)
       }
-      listen( queue, threads )
+      listen( queue, int(threads) )
     } else {
       threads := maxThreads()
       listen( queue, threads )
