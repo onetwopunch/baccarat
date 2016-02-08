@@ -1,5 +1,5 @@
-[server]
-port = 3000
-
 [redis]
 url = localhost:6379
+
+[headers]
+Authorization = TOKEN xyz
