@@ -1,0 +1,3 @@
+[deps]
+github.com/Unknwon/goconfig =
+gopkg.in/redis.v3 =
