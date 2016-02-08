@@ -1,7 +1,6 @@
 package main
 
 import (
-  "github.com/Unknwon/goconfig"
   "gopkg.in/redis.v3"
   "encoding/json"
   "fmt"
@@ -12,13 +11,10 @@ type Payload struct {
   URI     string
 }
 
-func getClient() (*redis.Client, error) {
-  c, _ := goconfig.LoadConfigFile(".config.ini")
-  url, _ := c.GetValue("redis", "url")
-  password, _ := c.GetValue("password", "url")
+func getClient(config *Config) (*redis.Client, error) {
+
   client := redis.NewClient(&redis.Options{
-      Addr:     url,
-      Password: password, // no password set
+      Addr:     config.redis,
       DB:       0,  // use default DB
   })
 
@@ -36,8 +32,8 @@ func cacheKey(queue string) (string) {
 }
 
 
-func Write( queue string, payload Payload ) (interface{}, error) {
-  c, e := getClient()
+func Write( queue string, payload Payload, config *Config ) (interface{}, error) {
+  c, e := getClient(config)
   if e != nil {
     return "", e
   } else {
@@ -54,8 +50,8 @@ func Write( queue string, payload Payload ) (interface{}, error) {
   }
   return "", nil
 }
-func Read( queue string ) (Payload, error){
-  c, e := getClient()
+func Read( queue string, config *Config ) (Payload, error){
+  c, e := getClient(config)
   var payload Payload
   if e != nil {
     return payload, e

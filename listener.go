@@ -7,33 +7,38 @@ import (
   "bytes"
   "encoding/json"
   "net/http"
+  "strings"
 )
-var openSlots = make(chan int)
 
 type Response struct {
-  status int
-  message string
+  Status int
+  Message string
+  Error error
 }
-func listen(queue string, threads int) {
-  openSlots <- threads
-  fmt.Println("Listening for redis messages on queue", queue, "...")
 
-  for true {
-    open := <- openSlots
-    if open < threads {
-      howMuch := threads - open
-      for i := 0; i < howMuch; i++ {
-        go doWork(queue)
+var slots = make(chan int)
+var open int
+func listen(queue string, conf *Config) {
+  fmt.Println("Listening for redis messages on queue", queue, "...")
+  open = conf.pool
+  for {
+    howMuch := conf.pool - open
+    fmt.Println("How much", howMuch)
+    if howMuch < conf.pool  {
+      if (open < 0){ open = 0 }
+      for i := 0; i < open; i++ {
+        go doWork(queue, conf)
+        open--
       }
     } else {
       time.Sleep(1 * time.Second)
     }
+    open = <- slots
   }
 }
 
-func doWork( queue string ) {
+func doWork( queue string, config *Config ) {
   var err error
-  var response Response
   var payload Payload
   var httpResponse *http.Response
   var req *http.Request
@@ -41,36 +46,45 @@ func doWork( queue string ) {
   var buff []byte
 
   // 1. pull work off queue
-  payload, err = Read(queue)
+  payload, err = Read(queue, config)
+  fmt.Println("Payload", payload)
 
   // 2. execute
-  out, err = exec.Command(payload.Command).Output()
+  cmd := strings.Split(payload.Command, " ")
+  out, err = exec.Command(cmd[0], cmd[1:]...).Output()
+  fmt.Println("Output", out, err)
 
   // 3. send stdout as json array in post
+  var response = new(Response)
   if err != nil{
-    response.status = 1
-    response.message = err.Error()
+    response.Status = 1
+    response.Error = err
   } else {
-    response.status = 0
-    response.message = string(out)
+    response.Status = 0
+    response.Message = string(out)
   }
-  buff, err = json.Marshal(payload)
+  buff, err = json.Marshal(response)
 
+  // fmt.Println("JSON", string(buff))
+  // fmt.Println("URI", payload.URI)
   req, err = http.NewRequest("POST", payload.URI, bytes.NewBuffer(buff))
   req.Header.Set("Content-Type", "application/json")
-  // TODO: Loop through a config of headers that the user defines
 
+  for key := range config.headers {
+    req.Header.Set(key, config.headers[ key ])
+  }
+
+  fmt.Println("Request", req)
   client := &http.Client{}
   httpResponse, err = client.Do(req)
   if err != nil {
-      fmt.Println("ERROR (request):", err)
+    fmt.Println("ERROR (request):", err)
   }
-  defer httpResponse.Body.Close()
   fmt.Println("response Status:", httpResponse.Status)
+  defer httpResponse.Body.Close()
 
-
-  // 4. decrement openSlots
-  open := <-openSlots
-  open--
-  openSlots <- open
+  // 4. decrement open slots
+  open++
+  fmt.Println("Open", open)
+  slots <- open
 }

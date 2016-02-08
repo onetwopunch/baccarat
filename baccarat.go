@@ -3,49 +3,56 @@ package main
 import (
   "fmt"
   "os"
-  "strconv"
   "runtime"
+  "github.com/Unknwon/goconfig"
 )
+type Config struct {
+  pool int
+  redis string
+  headers map[string]string
+}
 
 func main() {
   args := os.Args[1:]
-  isQ, queue := namedCommand(args, "-q")
-  isPool, pool := namedCommand(args, "--pool")
-  if isQ {
-    if isPool{
-      var err error
-      threads, err := strconv.ParseInt(pool, 10, 32)
-      if err != nil {
-        fmt.Println(err)
-      }
-      listen( queue, int(threads) )
-    } else {
-      threads := maxThreads()
-      listen( queue, threads )
+  hasQ, queue := namedCommand(args, "-q")
+  hasConfig, path := namedCommand(args, "-c")
+  config, err := NewConfig(path)
+  if hasQ && hasConfig {
+    if err != nil{
+      fmt.Println("ERROR (config)", err)
+      return
     }
-  } else {
-    // baccarat write queue 'ls -la' http://google.com
+    listen( queue, config )
 
+  } else if hasConfig {
+    // baccarat write queue 'ls -la' http://google.com
     cmd := args[0]
     if cmd == "write" {
-      if len(args) != 4 {
+      if len(args) < 4 {
         fmt.Println("Incorrect number of arguments")
         return
       }
       payload := Payload{args[2], args[3]}
-      val, e := Write(args[1], payload)
+      val, e := Write(args[1], payload, config)
       fmt.Println("Result:", val, e)
     } else if cmd == "read" {
-      if len(args) != 2 {
+      if len(args) < 2 {
         fmt.Println("Incorrect number of arguments")
         return
       }
-      payload, e := Read(args[1])
+      payload, e := Read(args[1], config)
       fmt.Println("Result:", payload, e)
+    } else {
+      usage()
     }
   }
 }
-
+func usage()  {
+  fmt.Println("baccarat - Concurrent background job scheduler")
+  fmt.Println("    Listen: baccarat -q queueName -c path/to/config.ini")
+  fmt.Println("    Write:  baccarat write queueName 'echo $PATH' http://example.com/notifications -c path/to/config.ini")
+  fmt.Println("    Read:   baccarat read queueName -c path/to/config.ini")
+}
 func maxThreads() int {
     maxProcs := runtime.GOMAXPROCS(0)
     numCPU := runtime.NumCPU()
@@ -54,7 +61,23 @@ func maxThreads() int {
     }
     return numCPU
 }
+func NewConfig(path string) (*Config, error) {
+  var config Config
+  c, err := goconfig.LoadConfigFile(path)
+  if err != nil {
+    return &config, err
+  }
+  config.headers, err = c.GetSection("headers")
+  config.redis, err = c.GetValue("redis", "url")
+  pool, pErr := c.Int("default", "pool")
 
+  if pErr == nil {
+    config.pool = pool
+  } else {
+    config.pool = maxThreads()
+  }
+  return &config, err
+}
 func namedCommand(args []string, item string) (bool, string) {
   for i, arg := range args {
     if arg == item {
