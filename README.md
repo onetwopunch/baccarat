@@ -1,6 +1,8 @@
-# Baccarat - Concurrent background tasks on any platform
+# Baccarat
+## Concurrent and distributable background task scheduler usable on any platform
 
-## This is still being worked on and should not be used in production yet
+
+*Disclaimer: This is still being worked on and should not be used in production yet*
 
 Works by reading command line args and callback URI's from Redis, executes the command and sends the output to a URI as a POST request with a status of 1 or 0 and the full stdout or error as a string.
 
