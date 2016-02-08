@@ -16,24 +16,33 @@ type Response struct {
   Error error
 }
 
-var slots = make(chan int)
-var open int
+var slots chan bool
+
 func listen(queue string, conf *Config) {
   fmt.Println("Listening for redis messages on queue", queue, "...")
-  open = conf.pool
+  open := conf.pool
+  slots = make(chan bool, open)
+
   for {
-    howMuch := conf.pool - open
-    fmt.Println("How much", howMuch)
-    if howMuch < conf.pool  {
+    used := conf.pool - open
+    // fmt.Println("Used", used)
+    // fmt.Println("Open", open)
+    if used < conf.pool  {
       if (open < 0){ open = 0 }
       for i := 0; i < open; i++ {
         go doWork(queue, conf)
         open--
+        // fmt.Println("Open after work queued", open)
       }
     } else {
       time.Sleep(1 * time.Second)
     }
-    open = <- slots
+    // Wait for a slot to open
+    // If there's more than one done in the queue, it'll get picked off
+    // the next time around
+    <- slots
+    open++
+    // fmt.Println("Open after work done", open)
   }
 }
 
@@ -52,7 +61,8 @@ func doWork( queue string, config *Config ) {
   // 2. execute
   cmd := strings.Split(payload.Command, " ")
   out, err = exec.Command(cmd[0], cmd[1:]...).Output()
-  fmt.Println("Output", out, err)
+
+  // fmt.Println("Output", out, err)
 
   // 3. send stdout as json array in post
   var response = new(Response)
@@ -84,7 +94,5 @@ func doWork( queue string, config *Config ) {
   defer httpResponse.Body.Close()
 
   // 4. decrement open slots
-  open++
-  fmt.Println("Open", open)
-  slots <- open
+  slots <- true
 }
