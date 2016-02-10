@@ -2,7 +2,9 @@
 ## Concurrent and distributable background task scheduler usable on any platform
 
 
-*Disclaimer: This is still being worked on and should not be used in production yet*
+*Disclaimer: This is still being worked on and should not be used in production yet. Pull requests are welcome!*
+
+Imagine being able to store a payload of a shell command and an HTTP endpoint in a Redis queue, have a blazingly fast, concurrent application process the command and send the result to your specified HTTP endpoint. That is Baccarat.
 
 Works by reading command line args and callback URI's from Redis, executes the command and sends the output to a URI as a POST request with a status of 1 or 0 and the full stdout or error as a string.
 
